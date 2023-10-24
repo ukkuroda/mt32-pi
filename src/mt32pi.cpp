@@ -30,6 +30,7 @@
 
 #include "lcd/drivers/hd44780.h"
 #include "lcd/drivers/ssd1306.h"
+#include "lcd/drivers/st7789.h"
 #include "lcd/ui.h"
 #include "mt32pi.h"
 
@@ -150,7 +151,11 @@ bool CMT32Pi::Initialize(bool bSerialMIDIAvailable)
 		case CConfig::TLCDType::SSD1306I2C:
 			m_pLCD = new CSSD1306(m_pI2CMaster, m_pConfig->LCDI2CLCDAddress, m_pConfig->LCDWidth, m_pConfig->LCDHeight, m_pConfig->LCDRotation, m_pConfig->LCDMirror);
 			break;
+		case CConfig::TLCDType::ST7789SPI:
+			m_pLCD = new CST7789(m_pSPIMaster, 9, 54, 54, 240, 240, 0, 0, 15000000, 1, ST7789_BLACK_COLOR, ST7789_WHITE_COLOR);
+			break;
 
+			
 		default:
 			break;
 	}
@@ -160,7 +165,7 @@ bool CMT32Pi::Initialize(bool bSerialMIDIAvailable)
 		if (m_pLCD->Initialize())
 		{
 			CLogger::Get()->RegisterPanicHandler(PanicHandler);
-
+			
 			// Splash screen
 			if (m_pLCD->GetType() == CLCD::TType::Graphical && !m_pConfig->SystemVerbose)
 				m_pLCD->DrawImage(TImage::MT32PiLogo, true);
@@ -194,7 +199,7 @@ bool CMT32Pi::Initialize(bool bSerialMIDIAvailable)
 
 	LCDLog(TLCDLogType::Startup, "Init Network");
 	InitNetwork();
-
+	
 	// Check for Blokas Pisound, but only when not using 4-bit HD44780 (GPIO pin conflict)
 	if (m_pConfig->LCDType != CConfig::TLCDType::HD44780FourBit)
 	{

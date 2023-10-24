@@ -16,6 +16,7 @@ OBJS		:=	src/config.o \
 			src/lcd/drivers/hd44780i2c.o \
 			src/lcd/drivers/sh1106.o \
 			src/lcd/drivers/ssd1306.o \
+			src/lcd/drivers/st7789.o \
 			src/lcd/ui.o \
 			src/main.o \
 			src/midimonitor.o \
@@ -31,7 +32,7 @@ OBJS		:=	src/config.o \
 			src/soundfontmanager.o \
 			src/synth/mt32synth.o \
 			src/synth/soundfontsynth.o \
-			src/zoneallocator.o
+			src/zoneallocator.o 
 
 EXTRACLEAN	+=	src/*.d src/*.o \
 			src/control/*.d src/control/*.o \
