@@ -25,7 +25,7 @@
 // THE SOFTWARE.
 //
 #include "lcd/drivers/st7789.h"
-#include "lcd/font6x8.h"
+//#include "lcd/font6x8.h"
 
 #include "utility.h"
 #include <assert.h>
@@ -247,8 +247,6 @@ void CST7789::Off (void)
 	Command (ST7789_DISPOFF);
 }
 
-/////////////////////
-
 void CST7789::Clear(bool bImmediate)
 {
 	for (unsigned int y=0; y<m_nHeight; y++) 
@@ -256,18 +254,33 @@ void CST7789::Clear(bool bImmediate)
 	{ 
 		m_FrameBuffers[m_nCurrentFrameBuffer][y][x] = m_BGColor;
 	}
-	if(bImmediate) {
-		Flip();
-	}
+	if(bImmediate)
+		WriteFrameBuffer(true);
+
 }
 	
 
 
-void CST7789::Print(const char* pText, u8 nX, u8 nY, bool bClearLine, bool bImmediate)
+void CST7789::Print(const char* pText, u8 nCursorX, u8 nCursorY, bool bClearLine, bool bImmediate)
 {
-	unsigned nCharWidth = 6;
-	unsigned nCharHeight = 8;
-	DrawTextColor(nX*nCharWidth, nY*nCharHeight, pText, m_FGColor, m_BGColor);
+	if(bClearLine)
+	{
+		for(u8 nChar = 0; nChar < nCursorX; ++nChar)
+			DrawChar(' ', nChar, nCursorY);
+	}
+	while (*pText && nCursorX < 20)
+	{
+		DrawChar(*pText++, nCursorX, nCursorY);
+		++nCursorX;
+	}
+	if(bClearLine)
+	{
+		while (nCursorX < 20)
+			DrawChar(' ', nCursorX++, nCursorY);
+	}
+	
+	if (bImmediate)
+		WriteFrameBuffer(true);
 }
 
 void CST7789::SetPixel(u8 nX, u8 nY)
@@ -286,15 +299,15 @@ void CST7789::DrawFilledRect(u8 nX1, u8 nY1, u8 nX2, u8 nY2, bool bImmediate)
 		for (unsigned int x = nX1; x < nX2; x++)
 			SetPixelColor(x, y, m_FGColor);
 	if (bImmediate)
-		Flip();
+		WriteFrameBuffer(true);
 }
 
 void CST7789::DrawChar(char chChar, u8 nCursorX, u8 nCursorY, bool bInverted, bool bDoubleWidth)
 {
-	unsigned nCharWidth = 6;
-	unsigned nCharHeight = 8;
+	unsigned nCharWidth = m_CharGen.GetCharWidth ();
+	unsigned nCharHeight = m_CharGen.GetCharHeight ();
 
-	DrawCharColor(chChar, nCursorX * nCharWidth, nCursorY * nCharHeight, m_FGColor, m_BGColor);
+	DrawCharColor(chChar, nCursorX * nCharWidth, nCursorY * nCharHeight, bInverted, bDoubleWidth, m_FGColor, m_BGColor);
 };
 
 void CST7789::DrawImage(TImage Image, bool bImmediate)
@@ -326,25 +339,39 @@ void CST7789::DrawImage(TImage Image, bool bImmediate)
 		}
 	}
 	if (bImmediate)
-		Flip();
+		WriteFrameBuffer(true);
 };
 
 void CST7789::Flip()
 {
-
-	SetWindow (0, 0, m_nWidth-1, m_nHeight-1);
-	for (unsigned y = 0; y < m_nHeight; y++)
-	{
-		SendData (m_FrameBuffers[m_nCurrentFrameBuffer][y], sizeof m_FrameBuffers[m_nCurrentFrameBuffer][y]);
-	}
-
-	m_nCurrentFrameBuffer = (m_nCurrentFrameBuffer + 1) % 2;
+	WriteFrameBuffer(true);
+	SwapFrameBuffers();
 };
 
 void CST7789::SetBacklightState(bool bEnabled)
 {
 
 };
+
+
+
+
+
+void CST7789::WriteFrameBuffer(bool bForceFullUpdate)
+{
+	SetWindow (0, 0, m_nWidth-1, m_nHeight-1);
+	for (unsigned y = 0; y < m_nHeight; y++)
+	{
+		SendData (m_FrameBuffers[m_nCurrentFrameBuffer][y], sizeof m_FrameBuffers[m_nCurrentFrameBuffer][y]);
+	}
+}
+
+void CST7789::SwapFrameBuffers()
+{
+	// Make other framebuffer current
+	m_nCurrentFrameBuffer = (m_nCurrentFrameBuffer + 1) % 2;
+}
+
 
 
 
@@ -359,49 +386,26 @@ void CST7789::SetPixelColor (unsigned nPosX, unsigned nPosY, TST7789Color Color)
 
 
 
-void CST7789::DrawCharColor(char chChar, u8 nPosX, u8 nPosY, TST7789Color FC, TST7789Color BC)
+void CST7789::DrawCharColor(char chChar, u8 nPosX, u8 nPosY, bool bInverted, bool bDoubleWidth, TST7789Color FC, TST7789Color BC)
 {
-	unsigned nCharWidth = 6;
-	unsigned nCharHeight = 8;
-	//TST7789Color Buf[nCharHeight][nCharWidth];
+	unsigned nCharWidth = m_CharGen.GetCharWidth ();
+	unsigned nCharHeight = m_CharGen.GetCharHeight ();
+
+	if (chChar == '\xFF')
+		chChar = '\x80';
+	else if (chChar < ' ')
+		chChar = ' ';
 
 	for (unsigned y = 0; y < nCharHeight; y++)
 	{
-		u8 nFontColumn = Font6x8[static_cast<u8>(chChar - ' ')][y];
 		for (unsigned x = 0; x < nCharWidth; x++)
 		{
 			m_FrameBuffers[m_nCurrentFrameBuffer][nPosY+y][nPosX+x] = 
-				(nFontColumn >> (nCharWidth-x-1)) & 0b00000001 
+				m_CharGen.GetPixel(chChar, x, y) ^ bInverted
 				? m_FGColor : m_BGColor;
 		}
 	}
-
-	/*
-	SetWindow(nPosX, nPosY, nPosX+nCharWidth-1, nPosY+nCharHeight-1);
-	SendData(Buffer, sizeof Buffer);
-	*/
 };
-
-void CST7789::DrawTextColor (unsigned nPosX, unsigned nPosY, const char *pString,
-			       TST7789Color FgColor, TST7789Color BgColor)
-{
-	assert (pString != 0);
-
-	unsigned nCharWidth = 6;
-	//unsigned nCharHeight = 8;
-
-
-	char chChar;
-	while ((chChar = *pString++) != '\0')
-	{
-		DrawCharColor(chChar, nPosX, nPosY, FgColor, BgColor);
-		nPosX += nCharWidth;
-	}
-}
-
-
-
-
 
 
 

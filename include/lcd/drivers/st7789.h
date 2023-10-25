@@ -61,6 +61,8 @@ public:
 	virtual void Flip() override;
 
 	virtual void SetBacklightState(bool bEnabled) override;
+	void WriteFrameBuffer(bool bForceFullUpdate);
+	void SwapFrameBuffers();
 
  
 	/// \param pSPIMaster Pointer to SPI master object
@@ -114,7 +116,7 @@ public:
 	/// \param BgColor RGB565 background color with swapped bytes (see: ST7789_COLOR())
 	void DrawTextColor (unsigned nPosX, unsigned nPosY, const char *pString,
 		       TST7789Color Color, TST7789Color BgColor = ST7789_BLACK_COLOR);
-	void DrawCharColor(char chChar, u8 nPosX, u8 nPosY, TST7789Color FC, TST7789Color BC);
+	void DrawCharColor(char chChar, u8 nPosX, u8 nPosY, bool bInverted, bool bDoubleWidth, TST7789Color FC, TST7789Color BC);
 
 private:
 	void SetWindow (unsigned x0, unsigned y0, unsigned x1, unsigned y1);
